@@ -8,3 +8,15 @@
 .DS_Store
 __pycache__/
 *.pyc
+
+# Dependencies, builds and private artifacts.
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+*.dump
+*.backup
+*.age
+*.log
+supabase/.temp/

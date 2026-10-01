@@ -1,0 +1,1 @@
+{"name":"@en-dic/web","private":true,"type":"module","scripts":{"dev":"vite --host 127.0.0.1","build":"vite build"},"dependencies":{"@en-dic/shared":"*","lucide-react":"1.49.0","react":"19.3.0","react-dom":"19.3.0"}}
