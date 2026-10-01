@@ -1,0 +1,10 @@
+# Secrets must be managed outside the project; these rules prevent accidental tracking.
+.env
+.env.*
+*.pem
+*.key
+
+# Local system and Python test artifacts.
+.DS_Store
+__pycache__/
+*.pyc
