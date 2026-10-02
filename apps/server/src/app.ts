@@ -82,6 +82,7 @@ export async function buildApp(options: AppOptions) {
     const sessionHash = session(req), id = await identity(req), controller = new AbortController();
     const code = await user(req, async sql => (await sql.query('select private.reserve_query($1) as result', [requestId])).rows[0].result);
     if (code !== 'ok') {
+      if (code === 'unauthorized') throw unauthorized();
       // A save can commit while its owner still holds the lease. Replaying here
       // must not release that lease because this invocation never acquired it.
       const saved = await replay?.();

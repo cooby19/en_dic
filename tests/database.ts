@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite';
-import { readFileSync } from 'node:fs';
+import { migrations, vaultStub } from './database-setup.js';
 import type { Database, Sql } from '../apps/server/src/db.js';
 import { unauthorized } from '../apps/server/src/errors.js';
 import { hash } from '../apps/server/src/auth.js';
@@ -10,14 +10,8 @@ export async function testDatabase() {
   const pg = new PGlite();
   // Vault is a Supabase extension, unavailable in embedded Postgres. Only this extension boundary
   // is replaced; all private tables, security-definer functions, transactions, roles and RLS are real SQL.
-  await pg.exec(`create role anon; create role authenticated;
-    create schema vault;
-    create table vault.secrets(id uuid primary key default gen_random_uuid(),secret text);
-    create view vault.decrypted_secrets as select id,secret,secret as decrypted_secret from vault.secrets;
-    create function vault.create_secret(value text) returns uuid language sql as $$ insert into vault.secrets(secret) values(value) returning id $$;
-    create function vault.update_secret(secret_id uuid,value text) returns void language sql as $$ update vault.secrets set secret=value where id=secret_id $$;`);
-  const migration = readFileSync(new URL('../supabase/migrations/20261001070225_dictionary_mvp.sql', import.meta.url), 'utf8');
-  await pg.exec(migration.replace('create extension if not exists supabase_vault with schema vault;', ''));
+  await pg.exec(`create role anon; create role authenticated; ${vaultStub}`);
+  for (const migration of migrations()) await pg.exec(migration);
   await pg.query('insert into private.invites(email,user_id) values($1,$2),($3,$4)', ['alice@example.invalid', ALICE, 'bob@example.invalid', BOB]);
   await pg.query("insert into private.sessions values($1,$2,clock_timestamp()+interval '7 days'),($3,$4,clock_timestamp()+interval '7 days')", [hash('alice-test-session'), ALICE, hash('bob-test-session'), BOB]);
   let queue = Promise.resolve();
