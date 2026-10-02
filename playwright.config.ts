@@ -6,7 +6,7 @@ import { defineConfig } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests',
-  testMatch: 'query.spec.ts',
+  testMatch: '*.spec.ts',
   outputDir: join(tmpdir(), `en-dic-playwright-${randomUUID()}`),
   workers: 1,
   use: {
@@ -18,7 +18,7 @@ export default defineConfig({
     },
   },
   webServer: {
-    command: 'npm run dev -w @en-dic/web -- --port 4173 --strictPort',
+    command: 'npm run build -w @en-dic/web && npm run dev -w @en-dic/web -- --port 4173 --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: false,
   },

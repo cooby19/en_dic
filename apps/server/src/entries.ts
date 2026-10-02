@@ -16,8 +16,8 @@ export function decodeCursor(cursor?: string): { at: string; id: string } | null
   try {
     if (cursor.length > 256) throw new Error();
     const parsed = JSON.parse(Buffer.from(cursor, 'base64url').toString());
-    if (typeof parsed.at !== 'string' || !Number.isFinite(Date.parse(parsed.at)) || !/^[a-f0-9-]{36}$/.test(parsed.id)) throw new Error();
-    return parsed;
+    if (!parsed || typeof parsed.at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(parsed.at) || !Number.isFinite(Date.parse(parsed.at)) || new Date(parsed.at).toISOString() !== parsed.at || typeof parsed.id !== 'string' || !/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(parsed.id)) throw new Error();
+    return { at: parsed.at, id: parsed.id };
   } catch { throw new AppError(400, 'INVALID_CURSOR', '分頁位置無效，請重新載入。'); }
 }
 export async function list(sql: Sql, kind: 'favorites' | 'history', search = '', cursor?: string) {

@@ -227,3 +227,22 @@ test('OAuth cookies are HttpOnly/Secure, PKCE flows are single-use, independent,
     assert.equal((await callback(start, String(start.headers['set-cookie']), 'bob')).headers.location, '/?login=invite');
   } finally { await f.close(); }
 });
+
+test('invalid cursor UUIDs return safe 400s; external errors never leak through API', async () => {
+  const marker = 'fixture-sensitive-provider-and-database-detail';
+  const f = await setup(async () => { throw new Error(marker); });
+  try {
+    for (const id of ['-'.repeat(36), 'a'.repeat(36), 42]) {
+      const cursor = Buffer.from(JSON.stringify({ at: '2026-10-02T07:00:00.000Z', id })).toString('base64url');
+      const result = await f.call('GET', `/api/entries?kind=history&cursor=${cursor}`);
+      assert.equal(result.statusCode, 400); assert.equal(result.json().error.code, 'INVALID_CURSOR');
+      assert.ok(!result.body.includes(marker));
+    }
+    const result = await f.call('POST', '/api/query', query());
+    assert.equal(result.statusCode, 500); assert.equal(result.json().error.code, 'INTERNAL_ERROR');
+    assert.ok(!result.body.includes(marker));
+    f.db.system = async () => { throw new Error(marker); };
+    const logout = await f.call('POST', '/api/logout');
+    assert.equal(logout.statusCode, 500); assert.ok(!logout.body.includes(marker));
+  } finally { await f.close(); }
+});

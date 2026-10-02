@@ -15,7 +15,7 @@
     "typecheck": "tsc --noEmit -p packages/shared && tsc --noEmit -p apps/server && tsc --noEmit -p apps/web && tsc -p tsconfig.tests.json",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:web": "playwright test",
-    "test:postgres": "node --import tsx --test tests/postgres.integration.ts",
+    "test:postgres": "node --import tsx --test tests/*.integration.ts",
     "test:docs": "python3 -m unittest discover -s tests -p 'test_*.py'",
     "check": "npm run test:docs && npm test && npm run test:postgres && npm run test:web && npm run typecheck && npm run build",
     "migrate": "node --import tsx scripts/migrate.ts",

@@ -2,6 +2,8 @@
 
 更新日期：2026-10-01（Asia/Taipei）。專案：`/Users/sihanchen/Desktop/en_dic`。
 
+本文件保留 2026-10-01 的歷史交接快照。後續 L01～L10 變更、目前命令與驗收結果以 [PROGRESS.md](PROGRESS.md)、[TESTING.md](TESTING.md) 及兩份產品文件為準；下方「目前沒有」與待辦敘述是當時狀態。
+
 ## 1. 使用者要求與目前停留位置
 
 原始要求是閱讀 `/Users/sihanchen/Downloads/PLAN (1).md` 後完成實作。計畫涵蓋「貼上英文 → 翻譯解析 → 自主收藏 → 搜尋與複習」的手機優先 PWA。

@@ -2,10 +2,15 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { BookOpen, Search, Bookmark, Clock3, Layers, Settings, ArrowUpRight, Volume2, ArrowLeft, Check, Plus, LogOut, Download, Trash2 } from 'lucide-react';
 import { DEFAULT_MODEL, type Entry, type Connection, type Analysis } from '@en-dic/shared';
-import { api, body, ApiError } from './api';
+import { api, body, ApiError, StaleResponse, invalidateResponses } from './api';
 import './style.css';
 type Page = 'query' | 'favorites' | 'history' | 'review' | 'settings';
 const pages = [{ id: 'query', label: '查詢', icon: Search }, { id: 'favorites', label: '收藏', icon: Bookmark }, { id: 'history', label: '歷史', icon: Clock3 }, { id: 'review', label: '複習', icon: Layers }, { id: 'settings', label: '設定', icon: Settings }] as const;
+function logoutFlag(): boolean {
+  try { if (sessionStorage.getItem('en-dic-logged-out') === '1') return true; } catch {}
+  try { return localStorage.getItem('en-dic-logout') !== null; } catch { return false; }
+}
+function loginAgain() { try { sessionStorage.removeItem('en-dic-logged-out'); localStorage.removeItem('en-dic-logout'); } catch {} }
 const date = (value: string) => new Intl.DateTimeFormat('zh-TW', { month: 'short', day: 'numeric' }).format(new Date(value));
 function AnalysisView({ analysis }: { analysis: Analysis }) {
   return <div className="analysis"><span className="tag">{{ word: '單字', phrase: '片語', sentence: '句子' }[analysis.kind]}</span><h2>{analysis.translation}</h2>
@@ -28,30 +33,45 @@ function App() {
   const [selected, setSelected] = useState<Entry | null>(null), [message, setMessage] = useState('');
   const [epoch, setEpoch] = useState(0), [offline, setOffline] = useState(!navigator.onLine);
   const generation = useRef(0), channel = useRef<BroadcastChannel | null>(null);
-  const clear = useCallback(() => { generation.current++; setSignedIn(false); setSelected(null); setMessage(''); setPage('query'); setEpoch(x => x + 1); if ('speechSynthesis' in window) speechSynthesis.cancel(); }, []);
-  const report = useCallback((error: unknown) => { if (error instanceof ApiError && error.status === 401) { clear(); setMessage(error.message); } else setMessage(error instanceof Error ? error.message : '操作失敗，請重試。'); }, [clear]);
+  const locked = useRef(logoutFlag());
+  const clear = useCallback(() => { invalidateResponses(); generation.current++; setSignedIn(false); setSelected(null); setMessage(''); setPage('query'); setEpoch(x => x + 1); if ('speechSynthesis' in window) speechSynthesis.cancel(); }, []);
+  const lock = useCallback(() => { locked.current = true; clear(); try { sessionStorage.setItem('en-dic-logged-out', '1'); } catch {} }, [clear]);
+  const report = useCallback((error: unknown) => { if (error instanceof StaleResponse) return; if (error instanceof ApiError && error.status === 401) { clear(); setMessage(error.message); } else setMessage(error instanceof ApiError ? error.message : '操作失敗，請重試。'); }, [clear]);
   useEffect(() => {
     let mounted = true;
-    const check = async () => { try { await api('/me'); if (mounted) setSignedIn(true); } catch (e) { if (mounted) { if (e instanceof ApiError && e.status === 401) clear(); else { setSignedIn(false); report(e); } } } };
+    const check = async () => {
+      if (locked.current) return clear();
+      const version = generation.current;
+      try { await api('/me'); if (mounted && version === generation.current && !locked.current) setSignedIn(true); }
+      catch (e) { if (mounted && version === generation.current) { clear(); report(e); } }
+    };
     void check();
-    const reconnect = () => { setOffline(!navigator.onLine); if (navigator.onLine) void check(); };
+    const reconnect = () => { setOffline(!navigator.onLine); if (navigator.onLine) { clear(); void check(); } else clear(); };
     const show = (event: PageTransitionEvent) => { if (event.persisted) { clear(); void check(); } };
-    const visible = () => { if (!document.hidden) { setSelected(null); setEpoch(x => x + 1); void check(); } };
-    window.addEventListener('online', reconnect); window.addEventListener('offline', reconnect); window.addEventListener('pageshow', show); document.addEventListener('visibilitychange', visible);
-    channel.current = 'BroadcastChannel' in window ? new BroadcastChannel('en-dic-session') : null;
-    if (channel.current) channel.current.onmessage = () => clear();
+    const hide = () => clear();
+    const visible = () => { clear(); if (!document.hidden) void check(); };
+    const storage = (event: StorageEvent) => { if (event.key === 'en-dic-logout') lock(); };
+    window.addEventListener('online', reconnect); window.addEventListener('offline', reconnect); window.addEventListener('pageshow', show); window.addEventListener('pagehide', hide); window.addEventListener('storage', storage); document.addEventListener('visibilitychange', visible);
+    channel.current = typeof BroadcastChannel === 'function' ? new BroadcastChannel('en-dic-session') : null;
+    if (channel.current) channel.current.onmessage = event => { if (event.data === 'logout') lock(); };
     if ('serviceWorker' in navigator) void navigator.serviceWorker.register('/sw.js').catch(() => {});
     const login = new URL(location.href).searchParams.get('login');
     if (login) { setMessage(login === 'invite' ? '這個帳號尚未受邀，請聯絡管理者。' : '登入取消或逾時，請再試一次。'); history.replaceState(null, '', '/'); }
-    return () => { mounted = false; window.removeEventListener('online', reconnect); window.removeEventListener('offline', reconnect); window.removeEventListener('pageshow', show); document.removeEventListener('visibilitychange', visible); channel.current?.close(); };
-  }, [clear, report]);
-  const logout = async () => { try { await api('/logout', { method: 'POST' }); channel.current?.postMessage('logout'); clear(); } catch (error) { clear(); report(error); } };
-  const open = async (id: string) => { const version = generation.current; try { const result = await api<Entry>(`/entries/${id}`); if (version === generation.current) setSelected(result); } catch (error) { report(error); } };
+    return () => { mounted = false; window.removeEventListener('online', reconnect); window.removeEventListener('offline', reconnect); window.removeEventListener('pageshow', show); window.removeEventListener('pagehide', hide); window.removeEventListener('storage', storage); document.removeEventListener('visibilitychange', visible); channel.current?.close(); };
+  }, [clear, lock, report]);
+  const logout = async () => {
+    lock(); channel.current?.postMessage('logout');
+    try { localStorage.setItem('en-dic-logout', crypto.randomUUID()); } catch { /* BroadcastChannel still clears other open tabs. */ }
+    try { await api('/logout', { method: 'POST' }); }
+    catch (error) { if (!(error instanceof StaleResponse)) setMessage('畫面已清除，但伺服器登出尚未完成。請恢復連線後重試登出。'); }
+  };
+  const version = generation.current;
+  const open = async (id: string) => { try { const result = await api<Entry>(`/entries/${id}`); if (version === generation.current) setSelected(result); } catch (error) { if (version === generation.current) report(error); } };
   const navigate = (next: Page) => { setPage(next); setSelected(null); setMessage(''); setEpoch(x => x + 1); };
   return <div className="app"><aside className="sidebar"><a className="brand" href="/"><BookOpen size={28}/><span>拾字<small>ENGLISH COLLECTION</small></span></a><p className="sidebar-note">把遇見的英文，<br/>變成自己的語言。</p>{signedIn && <nav>{pages.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => navigate(id)} className={page === id ? 'active' : ''}><Icon size={20}/>{label}</button>)}</nav>}<div className="sidebar-bottom"><span>一字一句，慢慢累積。</span>{signedIn && <button className="text-button" onClick={logout}><LogOut size={16}/>登出</button>}</div></aside>
     <div className="workspace"><header className="topbar"><span className="mobile-brand"><BookOpen size={22}/>拾字</span><span className="breadcrumb">你的英文收集辭典 <span>/ {pages.find(x => x.id === page)?.label}</span></span><span className="status-dot">{offline ? '目前離線' : '連線使用'}</span></header>
       <main>{offline && <div className="notice">目前離線。私人內容不會離線快取，恢復連線後即可查詢及同步。</div>}{message && <div className="notice error" role="alert">{message}<button aria-label="關閉提示" onClick={() => setMessage('')}>×</button></div>}
-        {signedIn === null ? <div className="empty">服務啟動中，首次連線可能需要稍候…</div> : !signedIn ? <div className="welcome"><span className="eyebrow">A LITTLE WORD, A NEW WORLD</span><h1>留住每一次<br/>理解的瞬間。</h1><p>貼上英文，讀懂意思。<br/>收藏值得記住的單字、片語與句子，<br/>在自己的節奏裡慢慢複習。</p><a className="primary" href="/auth/google">使用 Google 登入 <ArrowUpRight size={19}/></a><small>僅限受邀帳號 · 收藏在各裝置同步</small><div className="welcome-note"><BookOpen size={40}/><span>今天遇見的字，<br/>明天也記得。</span></div></div> : selected ? <EntryDetail key={selected.id} entry={selected} onBack={() => { setSelected(null); setEpoch(x => x + 1); }} report={report} onChange={setSelected}/> : <React.Fragment key={`${page}-${epoch}`}>
+        {signedIn === null ? <div className="empty">服務啟動中，首次連線可能需要稍候…</div> : !signedIn ? <div className="welcome"><span className="eyebrow">A LITTLE WORD, A NEW WORLD</span><h1>留住每一次<br/>理解的瞬間。</h1><p>貼上英文，讀懂意思。<br/>收藏值得記住的單字、片語與句子，<br/>在自己的節奏裡慢慢複習。</p><a className="primary" href="/auth/google" onClick={loginAgain}>使用 Google 登入 <ArrowUpRight size={19}/></a><small>僅限受邀帳號 · 收藏在各裝置同步</small>{locked.current && <button className="text-button" onClick={logout}>重試登出</button>}<div className="welcome-note"><BookOpen size={40}/><span>今天遇見的字，<br/>明天也記得。</span></div></div> : selected ? <EntryDetail key={selected.id} entry={selected} onBack={() => { setSelected(null); setEpoch(x => x + 1); }} report={report} onChange={value => { if (version === generation.current) setSelected(value); }}/> : <React.Fragment key={`${page}-${epoch}`}>
           {page === 'query' && <Query report={report} open={open} onSettings={() => navigate('settings')}/>}
           {(page === 'favorites' || page === 'history') && <EntryList kind={page} report={report} open={open}/>}
           {page === 'review' && <Review report={report}/>}
@@ -118,7 +138,7 @@ function SettingsView({ report, logout }: { report: Report; logout: () => void }
   const change = async (method: string, path = '/connection') => {
     if (!connection || busy) return; setBusy(true); setNotice('');
     try { const result = await api<Connection>(path, { method, ...(method === 'PUT' ? { body: body({ ...(key ? { key } : {}), model, version: connection.version }) } : {}) }); if (alive.current) { setConnection(result); setModel(result.model); setNotice(result.connected ? '連線測試成功，設定已保存。' : '已解除連線，收藏仍可查看。'); } }
-    catch (e) { report(e); const current = await api<Connection>('/connection').catch(() => null); if (alive.current && current) setConnection(current); }
+    catch (e) { if (e instanceof StaleResponse || !alive.current) return; report(e); const current = await api<Connection>('/connection').catch(() => null); if (alive.current && current) setConnection(current); }
     finally { if (alive.current) { setKey(''); setBusy(false); } }
   };
   const download = async () => { setBusy(true); try { const data = await api('/export'); if (!alive.current) return; const url = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })); const a = document.createElement('a'); a.href = url; a.download = 'english-collection.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000); } catch (e) { report(e); } finally { if (alive.current) setBusy(false); } };

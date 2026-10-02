@@ -30,7 +30,9 @@ export async function postgresCluster() {
   const close = async () => {
     await Promise.all(pools.map(pool => pool.end()));
     await control.end();
-    execFileSync(executable('pg_ctl'), ['-D', data, '-m', 'fast', '-w', 'stop'], { stdio: 'pipe' });
+    // Pool.end initiates socket shutdown. Smart shutdown lets those sockets
+    // drain instead of injecting administrator errors into the test runner.
+    execFileSync(executable('pg_ctl'), ['-D', data, '-m', 'smart', '-t', '10', '-w', 'stop'], { stdio: 'pipe' });
     // Retain temporary artifacts for failure diagnosis; no recursive deletion.
   };
   try {
@@ -38,15 +40,17 @@ export async function postgresCluster() {
   } catch (error) { await close(); throw error; }
   return {
     close,
-    async fixture() {
+    async fixture(options: { migrate?: boolean } = {}) {
       const name = `fixture_${randomUUID().replaceAll('-', '')}`;
       await control.query(`create database ${name}`);
       const admin = new pg.Pool({ ...config, database: name, max: 5 }); pools.push(admin);
       await admin.query(vaultStub);
-      for (const migration of migrations()) await admin.query(migration);
-      await admin.query('grant en_dic_runtime to en_dic_test_runtime');
-      await admin.query('insert into private.invites(email,user_id) values($1,$2),($3,$4)', ['alice@example.invalid', ALICE, 'bob@example.invalid', BOB]);
-      await admin.query("insert into private.sessions values($1,$2,clock_timestamp()+interval '7 days'),($3,$4,clock_timestamp()+interval '7 days')", [hash('alice-test-session'), ALICE, hash('bob-test-session'), BOB]);
+      if (options.migrate !== false) for (const migration of migrations()) await admin.query(migration);
+      if (options.migrate !== false) {
+        await admin.query('grant en_dic_runtime to en_dic_test_runtime');
+        await admin.query('insert into private.invites(email,user_id) values($1,$2),($3,$4)', ['alice@example.invalid', ALICE, 'bob@example.invalid', BOB]);
+        await admin.query("insert into private.sessions values($1,$2,clock_timestamp()+interval '7 days'),($3,$4,clock_timestamp()+interval '7 days')", [hash('alice-test-session'), ALICE, hash('bob-test-session'), BOB]);
+      }
       const runtime = new pg.Pool({ ...config, database: name, user: 'en_dic_test_runtime', max: 12 }); pools.push(runtime);
       const db = database(runtime);
       return { admin, runtime, db,

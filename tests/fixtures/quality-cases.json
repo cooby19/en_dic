@@ -1,0 +1,322 @@
+[
+  {
+    "id": "Q01",
+    "category": "word",
+    "original": "resilient",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "有韌性、能恢復；形容詞與適當用法"
+  },
+  {
+    "id": "Q02",
+    "category": "word",
+    "original": "subtle",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "微妙、不易察覺；避免簡化成小"
+  },
+  {
+    "id": "Q03",
+    "category": "word",
+    "original": "commute",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "通勤；詞性與動詞／名詞常見用法"
+  },
+  {
+    "id": "Q04",
+    "category": "word",
+    "original": "reluctant",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "不情願；常見 reluctant to 結構"
+  },
+  {
+    "id": "Q05",
+    "category": "word",
+    "original": "linger",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "逗留、持續存在；動詞與用法"
+  },
+  {
+    "id": "Q06",
+    "category": "word",
+    "original": "meticulous",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "一絲不苟；形容詞與細心語意"
+  },
+  {
+    "id": "Q07",
+    "category": "word",
+    "original": "nevertheless",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "然而、儘管如此；轉折副詞"
+  },
+  {
+    "id": "Q08",
+    "category": "word",
+    "original": "awkward",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "尷尬、笨拙；多義提示"
+  },
+  {
+    "id": "Q09",
+    "category": "phrase",
+    "original": "break the ice",
+    "context": "At the beginning of a meeting.",
+    "expectedKind": "phrase",
+    "criteria": "打破僵局；非字面冰塊"
+  },
+  {
+    "id": "Q10",
+    "category": "phrase",
+    "original": "on the fence",
+    "context": "Someone has not made a decision.",
+    "expectedKind": "phrase",
+    "criteria": "猶豫未決；非坐在柵欄"
+  },
+  {
+    "id": "Q11",
+    "category": "phrase",
+    "original": "a piece of cake",
+    "context": "Talking about an easy task.",
+    "expectedKind": "phrase",
+    "criteria": "輕而易舉；非甜點"
+  },
+  {
+    "id": "Q12",
+    "category": "phrase",
+    "original": "come up with",
+    "context": "Talking about a new idea.",
+    "expectedKind": "phrase",
+    "criteria": "想出；解釋片語用法與例句"
+  },
+  {
+    "id": "Q13",
+    "category": "phrase",
+    "original": "call it a day",
+    "context": "After finishing enough work.",
+    "expectedKind": "phrase",
+    "criteria": "收工；非命名日子"
+  },
+  {
+    "id": "Q14",
+    "category": "phrase",
+    "original": "under the weather",
+    "context": "Talking about health.",
+    "expectedKind": "phrase",
+    "criteria": "身體不舒服；非氣象"
+  },
+  {
+    "id": "Q15",
+    "category": "phrase",
+    "original": "take for granted",
+    "context": "",
+    "expectedKind": "phrase",
+    "criteria": "視為理所當然；說明賓語位置"
+  },
+  {
+    "id": "Q16",
+    "category": "phrase",
+    "original": "in the long run",
+    "context": "",
+    "expectedKind": "phrase",
+    "criteria": "長期而言；自然例句"
+  },
+  {
+    "id": "Q17",
+    "category": "polysemy",
+    "original": "bank",
+    "context": "We sat on the bank of the river.",
+    "expectedKind": "word",
+    "criteria": "河岸；依上下文排除銀行"
+  },
+  {
+    "id": "Q18",
+    "category": "polysemy",
+    "original": "bank",
+    "context": "She opened an account at the bank.",
+    "expectedKind": "word",
+    "criteria": "銀行；詞性與上下文一致"
+  },
+  {
+    "id": "Q19",
+    "category": "polysemy",
+    "original": "charge",
+    "context": "The store will charge ten dollars.",
+    "expectedKind": "word",
+    "criteria": "收費；非電荷或攻擊"
+  },
+  {
+    "id": "Q20",
+    "category": "polysemy",
+    "original": "charge",
+    "context": "The battery needs a charge.",
+    "expectedKind": "word",
+    "criteria": "充電；非費用"
+  },
+  {
+    "id": "Q21",
+    "category": "polysemy",
+    "original": "light",
+    "context": "This suitcase is light.",
+    "expectedKind": "word",
+    "criteria": "輕的；非光線"
+  },
+  {
+    "id": "Q22",
+    "category": "polysemy",
+    "original": "light",
+    "context": "Please turn on the light.",
+    "expectedKind": "word",
+    "criteria": "燈；非輕巧"
+  },
+  {
+    "id": "Q23",
+    "category": "polysemy",
+    "original": "run",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "列出跑步、運作等常見意思並提示補充語境"
+  },
+  {
+    "id": "Q24",
+    "category": "polysemy",
+    "original": "fine",
+    "context": "",
+    "expectedKind": "word",
+    "criteria": "列出好、細緻、罰款等常見意思並提示補充語境"
+  },
+  {
+    "id": "Q25",
+    "category": "ellipsis",
+    "original": "Coming?",
+    "context": "A friend asks whether you will join.",
+    "expectedKind": "sentence",
+    "criteria": "省略 Are you；你要來嗎"
+  },
+  {
+    "id": "Q26",
+    "category": "ellipsis",
+    "original": "Not yet.",
+    "context": "Have you finished the book?",
+    "expectedKind": "sentence",
+    "criteria": "還沒；連結上下文而非否定未來"
+  },
+  {
+    "id": "Q27",
+    "category": "ellipsis",
+    "original": "Sounds good.",
+    "context": "A friend proposes a plan.",
+    "expectedKind": "sentence",
+    "criteria": "聽起來不錯；省略主詞"
+  },
+  {
+    "id": "Q28",
+    "category": "ellipsis",
+    "original": "If only I had known.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "要是早知道就好了；過去反事實願望"
+  },
+  {
+    "id": "Q29",
+    "category": "ellipsis",
+    "original": "The sooner, the better.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "越早越好；比較級相關結構"
+  },
+  {
+    "id": "Q30",
+    "category": "ellipsis",
+    "original": "No wonder.",
+    "context": "It rained all night and the ground is wet.",
+    "expectedKind": "sentence",
+    "criteria": "難怪；回應解釋與省略形式"
+  },
+  {
+    "id": "Q31",
+    "category": "ellipsis",
+    "original": "Been there, done that.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "經歷過了；口語省略與語氣"
+  },
+  {
+    "id": "Q32",
+    "category": "ellipsis",
+    "original": "Need a hand?",
+    "context": "Someone is carrying a heavy box.",
+    "expectedKind": "sentence",
+    "criteria": "需要幫忙嗎；非手掌物品"
+  },
+  {
+    "id": "Q33",
+    "category": "paragraph",
+    "original": "The train was late, so we walked to the library. By the time we arrived, the rain had stopped.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "自然翻譯；過去完成式及先後順序"
+  },
+  {
+    "id": "Q34",
+    "category": "paragraph",
+    "original": "Although the recipe looked simple, the bread did not rise. We decided to try again with fresh yeast.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "讓步關係、麵包發酵；保留全部原文"
+  },
+  {
+    "id": "Q35",
+    "category": "paragraph",
+    "original": "I used to read before bed. These days, I listen to short stories instead.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "過去習慣和現在對比；used to"
+  },
+  {
+    "id": "Q36",
+    "category": "paragraph",
+    "original": "The book that you recommended was fascinating. I could hardly put it down.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "關係子句；愛不釋手非放不下物理位置"
+  },
+  {
+    "id": "Q37",
+    "category": "paragraph",
+    "original": "If the weather clears up, we will have a picnic. Otherwise, we can cook at home.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "真實條件與備案；clear up 天氣放晴"
+  },
+  {
+    "id": "Q38",
+    "category": "paragraph",
+    "original": "The more we practiced, the more confident we became. Progress was slow but steady.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "越練越有自信；slow but steady 自然譯法"
+  },
+  {
+    "id": "Q39",
+    "category": "paragraph",
+    "original": "A small garden can attract birds and insects. Planting native flowers helps them find food.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "動名詞主詞、原生植物；them 指涉鳥與昆蟲"
+  },
+  {
+    "id": "Q40",
+    "category": "paragraph",
+    "original": "She said she would send the notes after lunch. I had already checked my inbox twice when they finally arrived.",
+    "context": "",
+    "expectedKind": "sentence",
+    "criteria": "間接引語及過去完成式；notes 到達的時序"
+  }
+]
