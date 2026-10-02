@@ -16,6 +16,67 @@ async function setup(analyze: (input: ModelInput) => Promise<Analysis> = async i
   return { ...data, app, call, close: async () => { await app.close(); await data.close(); } };
 }
 const query = (original = ' hello ', context = '') => ({ original, context, requestId: randomUUID() });
+function deferred<T = void>() {
+  let resolve!: (value: T | PromiseLike<T>) => void;
+  const promise = new Promise<T>(done => { resolve = done; });
+  return { promise, resolve };
+}
+
+test('retry racing with a committed save replays success or reports a fingerprint conflict without a second model call', { timeout: 20000 }, async t => {
+  for (const holdLease of [false, true]) for (const conflict of [false, true]) {
+    await t.test(`lease ${holdLease ? 'held' : 'released'}, ${conflict ? 'different' : 'same'} input`, async () => {
+      const started = deferred(), model = deferred<Analysis>(), lookupRead = deferred(), resumeLookup = deferred();
+      const saveCommitted = deferred(), returnSave = deferred();
+      let calls = 0;
+      const f = await setup(async () => { calls++; started.resolve(); return model.promise; });
+      try {
+        const input = query(), first = f.call('POST', '/api/query', input);
+        await started.promise;
+        const user = f.db.user;
+        let pauseLookup = true;
+        // Pause AFTER each real transaction commits so PGlite's single connection
+        // can execute the other request. This deterministically reproduces the
+        // lookup -> save -> reserve ordering without pretending to test DB locks.
+        f.db.user = async (sessionHash, fn) => {
+          let paused = false, completed = false;
+          const result = await user(sessionHash, (sql, id) => fn({ query: async <T = Record<string, any>>(text: string, values?: any[]) => {
+            const rows = await sql.query<T>(text, values);
+            if (pauseLookup && text.includes('private.request_status') && !rows.rows.length) {
+              pauseLookup = false; paused = true;
+            }
+            if (holdLease && text.includes('private.complete_request')) completed = true;
+            return rows;
+          } }, id));
+          if (paused) { lookupRead.resolve(); await resumeLookup.promise; }
+          if (completed) { saveCommitted.resolve(); await returnSave.promise; }
+          return result;
+        };
+        const retry = f.call('POST', '/api/query', conflict ? { ...input, context: 'changed' } : input);
+        await lookupRead.promise;
+        model.resolve(analysis);
+        let original;
+        if (holdLease) await saveCommitted.promise;
+        else { original = await first; assert.equal(original.statusCode, 200); }
+        resumeLookup.resolve();
+        const replay = await retry;
+        assert.equal(replay.statusCode, conflict ? 409 : 200);
+        if (conflict) assert.equal(replay.json().error.code, 'REQUEST_CONFLICT');
+        else {
+          const saved = (await f.admin('select entry_id from private.requests where request_id=$1', [input.requestId])).rows[0];
+          assert.equal(replay.json().entry.id, saved.entry_id);
+        }
+        assert.equal(calls, 1, 'a completed request must not invoke the model again');
+        assert.equal((await f.admin('select count(*)::int as total from private.entries')).rows[0].total, 1);
+        assert.equal((await f.admin('select count(*)::int as total from private.requests')).rows[0].total, 1);
+        // A replay that did not acquire the lease must leave the owner's lease alone.
+        assert.equal((await f.admin('select count(*)::int as total from private.leases')).rows[0].total, holdLease ? 1 : 0);
+        returnSave.resolve();
+        assert.equal((await first).statusCode, 200);
+        assert.equal((await f.admin('select count(*)::int as total from private.leases')).rows[0].total, 0);
+      } finally { model.resolve(analysis); resumeLookup.resolve(); returnSave.resolve(); await f.close(); }
+    });
+  }
+});
 
 test('successful queries preserve input, deduplicate retries and offer existing favorites without overwriting', async () => {
   let calls = 0; const f = await setup(async () => { calls++; return analysis; });
@@ -26,6 +87,8 @@ test('successful queries preserve input, deduplicate retries and offer existing 
     const saved = await f.call('PATCH', `/api/entries/${first.id}`, { favorite: true, notes: 'fixture note', source: 'fixture source' }); assert.equal(saved.json().expiresAt, null);
     assert.equal((await f.call('POST', '/api/query', input)).json().entry.id, first.id); assert.equal(calls, 1);
     assert.equal((await f.call('POST', '/api/query', { ...input, original: 'different' })).statusCode, 409);
+    const identical = (await f.call('POST', '/api/query', query(input.original, input.context))).json();
+    assert.notEqual(identical.entry.id, first.id); assert.deepEqual(identical.existingFavorites, [first.id]); assert.equal(calls, 2);
     const next = (await f.call('POST', '/api/query', query('cafe\u0301'))).json(); assert.deepEqual(next.existingFavorites, [first.id]); assert.notEqual(next.entry.id, first.id);
     assert.equal((await f.call('GET', `/api/entries/${first.id}`)).json().notes, 'fixture note');
     assert.deepEqual((await f.call('POST', '/api/query', query('Café'))).json().existingFavorites, []);

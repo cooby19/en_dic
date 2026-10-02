@@ -71,7 +71,7 @@ function Query({ report, open, onSettings }: { report: Report; open: (id: string
     e.preventDefault(); if (busy || !original.trim()) return;
     const input = body({ original, context }); if (request.current?.input !== input) request.current = { input, id: crypto.randomUUID() };
     setBusy(true); setResult(null); setExisting([]);
-    try { const data = await api<{ entry: Entry; existingFavorites: string[] }>('/query', { method: 'POST', body: body({ original, context, requestId: request.current.id }) }); if (alive.current) { setResult(data.entry); setExisting(data.existingFavorites); } }
+    try { const data = await api<{ entry: Entry; existingFavorites: string[] }>('/query', { method: 'POST', body: body({ original, context, requestId: request.current.id }) }); request.current = null; if (alive.current) { setResult(data.entry); setExisting(data.existingFavorites); } }
     catch (error) { if (alive.current) report(error); } finally { if (alive.current) setBusy(false); }
   };
   const favorite = async () => { if (!result || busy) return; setBusy(true); try { const saved = await api<Entry>(`/entries/${result.id}`, { method: 'PATCH', body: body({ favorite: !result.favorite }) }); if (alive.current) setResult(saved); } catch (e) { report(e); } finally { if (alive.current) setBusy(false); } };

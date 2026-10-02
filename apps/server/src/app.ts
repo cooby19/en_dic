@@ -78,10 +78,16 @@ export async function buildApp(options: AppOptions) {
   });
   app.get('/api/connection', async req => user(req, status));
   app.get('/api/models', async () => ({ models: analyzer.models(), defaultModel: DEFAULT_MODEL }));
-  async function runModel<T>(req: FastifyRequest, requestId: string, connection: Connection, credentials: ReturnType<typeof suppliedCredential>, original: string, context: string, finish: (analysis: import('@en-dic/shared').Analysis) => Promise<T>) {
+  async function runModel<T>(req: FastifyRequest, requestId: string, connection: Connection, credentials: ReturnType<typeof suppliedCredential>, original: string, context: string, finish: (analysis: import('@en-dic/shared').Analysis) => Promise<T>, replay?: () => Promise<T | undefined>) {
     const sessionHash = session(req), id = await identity(req), controller = new AbortController();
     const code = await user(req, async sql => (await sql.query('select private.reserve_query($1) as result', [requestId])).rows[0].result);
-    if (code !== 'ok') throw new AppError(code === 'busy' ? 409 : 429, code === 'busy' ? 'QUERY_BUSY' : 'QUERY_LIMIT', code === 'busy' ? '已有解析進行中，請稍候再試。' : '已達每分鐘 10 次或每日 100 次查詢限制。');
+    if (code !== 'ok') {
+      // A save can commit while its owner still holds the lease. Replaying here
+      // must not release that lease because this invocation never acquired it.
+      const saved = await replay?.();
+      if (saved !== undefined) return saved;
+      throw new AppError(code === 'busy' ? 409 : 429, code === 'busy' ? 'QUERY_BUSY' : 'QUERY_LIMIT', code === 'busy' ? '已有解析進行中，請稍候再試。' : '已達每分鐘 10 次或每日 100 次查詢限制。');
+    }
     const set = active.get(id) ?? new Set<AbortController>(); set.add(controller); active.set(id, set);
     const timeout = setTimeout(() => controller.abort(new AppError(504, 'MODEL_TIMEOUT', '解析超過 60 秒，請手動重試。')), options.timeoutMs ?? 60000);
     let checking = false;
@@ -91,6 +97,10 @@ export async function buildApp(options: AppOptions) {
       catch { controller.abort(unauthorized()); } finally { checking = false; }
     }, 500);
     try {
+      // The initial lookup may predate another invocation's completed save.
+      // Recheck only after acquiring the lease, before invoking the model.
+      const saved = await replay?.();
+      if (saved !== undefined) return saved;
       const result = await Promise.race([
         analyzer.analyze({ original, context, model: connection.model, credentials, signal: controller.signal }),
         new Promise<never>((_resolve, reject) => controller.signal.addEventListener('abort', () => reject(controller.signal.reason), { once: true })),
@@ -139,11 +149,14 @@ export async function buildApp(options: AppOptions) {
     if (!original.trim()) throw new AppError(400, 'INVALID_INPUT', '請貼上英文內容。');
     const fingerprint = hash(JSON.stringify([original, context]));
     const favorites = (sql: Sql) => sql.query('select id from private.entries where favorite and normalized=$1 and normalized_context=$2 order by favorited_at desc,id desc', [normalize(original), normalize(context)]);
-    const previous = await user(req, async sql => (await sql.query('select * from private.request_status($1)', [requestId])).rows[0]);
-    if (previous) {
+    const replay = () => user(req, async sql => {
+      const previous = (await sql.query('select * from private.request_status($1)', [requestId])).rows[0];
+      if (!previous) return undefined;
       if (previous.fingerprint !== fingerprint) throw new AppError(409, 'REQUEST_CONFLICT', '此請求識別已用於其他內容。');
-      return user(req, async sql => ({ entry: await detail(sql, previous.entry_id), existingFavorites: (await favorites(sql)).rows.map(x => x.id) }));
-    }
+      return { entry: await detail(sql, previous.entry_id), existingFavorites: (await favorites(sql)).rows.map(x => x.id) };
+    });
+    const previous = await replay();
+    if (previous !== undefined) return previous;
     const connection = await user(req, status);
     if (!connection.connected) throw new AppError(409, 'CONNECTION_REQUIRED', '請先在設定連接 Gemini Key。');
     try {
@@ -153,7 +166,7 @@ export async function buildApp(options: AppOptions) {
         const { rows } = await sql.query('insert into private.entries(user_id,request_id,original,context,normalized,normalized_context,analysis,model) values($1,$2,$3,$4,$5,$6,$7,$8) returning *', [id, requestId, original, context, normalize(original), normalize(context), JSON.stringify(analysis), connection.model]);
         await sql.query('select private.complete_request($1,$2,$3)', [requestId, fingerprint, rows[0].id]);
         return { entry: entry(rows[0]), existingFavorites: (await favorites(sql)).rows.map(x => x.id) };
-      }));
+      }), replay);
     } catch (error) { if (error instanceof AppError && ['MODEL_AUTH', 'MODEL_UNAVAILABLE'].includes(error.code)) await user(req, sql => sql.query('select private.connection_error($1)', [connection.version])); throw error; }
     finally { /* runModel owns the lease */ }
   });
