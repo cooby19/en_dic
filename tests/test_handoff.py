@@ -18,7 +18,10 @@ class HandoffTests(unittest.TestCase):
     def test_implemented_source_references_exist(self):
         text = (ROOT / 'handoff.md').read_text(encoding='utf-8')
         implemented = text.split('## 4. 已寫入的程式與檔案', 1)[1].split('## 5.', 1)[0]
-        for target in re.findall(r'`([^`]+)`', implemented):
+        # Only the implementation table claims paths exist. Later prose also
+        # mentions empty directories, which Git does not preserve in a checkout.
+        table_cells = re.findall(r'^\| ([^|\n]+) \|', implemented, re.MULTILINE)
+        for target in re.findall(r'`([^`]+)`', '\n'.join(table_cells)):
             if target.startswith(('apps/', 'packages/', 'supabase/', 'tests/')) and '*' not in target:
                 with self.subTest(target=target):
                     self.assertTrue((ROOT / target).exists())
